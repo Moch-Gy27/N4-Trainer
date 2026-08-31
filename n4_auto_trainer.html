@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>N4 Auto Trainer</title>
+<style>
+:root{--bg:#0f1115;--card:#171a21;--card2:#20242d;--text:#f5f7fb;--muted:#9ca3af;--accent:#7c5cff;--good:#35c98a;--bad:#ff5d6c;--border:#2a2f3a}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(160deg,#0c0e12,#151821);color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif;min-height:100vh}
+.app{max-width:850px;margin:auto;padding:24px 16px 60px}.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}.brand{font-size:23px;font-weight:800}.brand span{color:var(--accent)}button{border:0;border-radius:12px;padding:11px 15px;background:var(--card2);color:var(--text);cursor:pointer;font-weight:700}button:hover{filter:brightness(1.12)}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px}.stat,.card{background:rgba(23,26,33,.94);border:1px solid var(--border);border-radius:18px}.stat{padding:14px}.stat b{display:block;font-size:22px}.stat small{color:var(--muted)}
+.progress{height:9px;background:#292e38;border-radius:99px;overflow:hidden;margin:10px 0 4px}.bar{height:100%;background:var(--accent);width:0%;transition:.3s}
+.card{padding:24px}.mode{color:var(--muted);font-size:13px;margin-bottom:25px}.word{text-align:center;font-size:54px;font-weight:800;letter-spacing:2px;margin:20px 0 5px}.reading{text-align:center;color:var(--muted);font-size:18px;min-height:27px}.question{text-align:center;color:#cbd0da;margin:28px 0 15px}
+.answer{display:flex;gap:10px;max-width:560px;margin:auto}.answer input{flex:1;background:#0e1015;border:1px solid var(--border);color:white;border-radius:12px;padding:15px;font-size:17px;outline:none}.answer input:focus{border-color:var(--accent)}.answer button{background:var(--accent);min-width:100px}
+.feedback{text-align:center;min-height:65px;margin-top:18px}.feedback .ok{color:var(--good)}.feedback .no{color:var(--bad)}.next{display:none;margin:8px auto 0;background:var(--card2)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px}.panel{padding:17px;background:var(--card);border:1px solid var(--border);border-radius:16px}.panel h3{margin:0 0 10px;font-size:15px}.weak{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #292e38}.weak:last-child{border:0}.pill{font-size:11px;padding:4px 7px;border-radius:8px;background:#292e38;color:#bbb}.empty{color:var(--muted);font-size:14px}
+.footer{text-align:center;color:#656b77;font-size:12px;margin-top:22px}
+@media(max-width:650px){.stats{grid-template-columns:1fr 1fr}.word{font-size:42px}.answer{flex-direction:column}.answer button{width:100%}.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="top">
+    <div class="brand">N4 <span>Auto Trainer</span></div>
+    <button onclick="resetData()">Reset</button>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><small>Mastery</small><b id="mastery">0%</b></div>
+    <div class="stat"><small>Hari ini</small><b id="today">0</b></div>
+    <div class="stat"><small>Review</small><b id="review">0</b></div>
+    <div class="stat"><small>Streak</small><b id="streak">0 🔥</b></div>
+  </div>
+
+  <div class="card">
+    <div class="mode" id="mode">Jepang → Indonesia</div>
+    <div class="word" id="word">食べる</div>
+    <div class="reading" id="reading">たべる</div>
+    <div class="question">Apa arti kata ini?</div>
+    <div class="answer">
+      <input id="input" autocomplete="off" placeholder="Ketik jawaban..." onkeydown="if(event.key==='Enter')checkAnswer()">
+      <button onclick="checkAnswer()">Jawab</button>
+    </div>
+    <div class="feedback" id="feedback"></div>
+    <button class="next" id="next" onclick="nextCard()">Lanjut →</button>
+  </div>
+
+  <div class="progress"><div class="bar" id="bar"></div></div>
+
+  <div class="grid">
+    <div class="panel">
+      <h3>📚 Progress</h3>
+      <div id="progressText" class="empty">Belum ada data.</div>
+    </div>
+    <div class="panel">
+      <h3>⚠️ Weak Words</h3>
+      <div id="weakList" class="empty">Belum ada kata lemah.</div>
+    </div>
+  </div>
+  <div class="footer">Skor ditentukan otomatis dari akurasi + konsistensi. Tidak ada tombol “Easy/Good/Hard”.</div>
+</div>
+
+<script>
+const WORDS=[
+["食べる","たべる","makan"],["飲む","のむ","minum"],["見る","みる","melihat"],["聞く","きく","mendengar"],["話す","はなす","berbicara"],
+["読む","よむ","membaca"],["書く","かく","menulis"],["買う","かう","membeli"],["売る","うる","menjual"],["使う","つかう","menggunakan"],
+["作る","つくる","membuat"],["働く","はたらく","bekerja"],["休む","やすむ","istirahat"],["起きる","おきる","bangun"],["寝る","ねる","tidur"],
+["行く","いく","pergi"],["来る","くる","datang"],["帰る","かえる","pulang"],["会う","あう","bertemu"],["住む","すむ","tinggal"],
+["勉強","べんきょう","belajar"],["仕事","しごと","pekerjaan"],["学校","がっこう","sekolah"],["会社","かいしゃ","perusahaan"],["友達","ともだち","teman"],
+["約束","やくそく","janji"],["時間","じかん","waktu"],["毎日","まいにち","setiap hari"],["大切","たいせつ","penting"],["便利","べんり","praktis"],
+["必要","ひつよう","perlu"],["簡単","かんたん","mudah"],["難しい","むずかしい","sulit"],["新しい","あたらしい","baru"],["古い","ふるい","lama"],
+["近い","ちかい","dekat"],["遠い","とおい","jauh"],["早い","はやい","cepat/awal"],["遅い","おそい","lambat/terlambat"],["多い","おおい","banyak"],
+["少ない","すくない","sedikit"],["楽しい","たのしい","menyenangkan"],["忙しい","いそがしい","sibuk"],["元気","げんき","sehat/bersemangat"],["有名","ゆうめい","terkenal"]
+];
+
+let data=JSON.parse(localStorage.getItem("n4auto")||"{}");
+let todayKey=new Date().toISOString().slice(0,10);
+if(!data.cards)data.cards={};
+if(!data.today)data.today={date:todayKey,count:0};
+if(data.today.date!==todayKey)data.today={date:todayKey,count:0};
+if(!data.streak)data.streak=0;
+let current=null,answered=false;
+
+function cardState(i){return data.cards[i]||(data.cards[i]={correct:0,total:0,mastery:0,next:0,last:0,wrong:0});}
+function norm(s){return s.toLowerCase().trim().replace(/[。、,.!?]/g,"").replace(/\s+/g," ")}
+function choose(){
+ let now=Date.now(), due=[];
+ WORDS.forEach((w,i)=>{let s=cardState(i);if(!s.next||s.next<=now)due.push(i)});
+ if(!due.length) due=WORDS.map((_,i)=>i).sort((a,b)=>cardState(a).mastery-cardState(b).mastery).slice(0,8);
+ let idx=due[Math.floor(Math.random()*due.length)];
+ current=idx; answered=false;
+ const w=WORDS[idx]; document.getElementById("word").textContent=w[0];
+ document.getElementById("reading").textContent=w[1];
+ document.getElementById("input").value="";
+ document.getElementById("input").disabled=false;
+ document.getElementById("feedback").innerHTML="";
+ document.getElementById("next").style.display="none";
+ document.getElementById("input").focus(); update();
+}
+function checkAnswer(){
+ if(answered)return;
+ const inp=norm(document.getElementById("input").value); if(!inp)return;
+ answered=true;
+ const w=WORDS[current], s=cardState(current), ok=inp===norm(w[2])||inp===norm(w[0]);
+ s.total++; data.today.count++;
+ if(ok){
+   s.correct++; s.wrong=0;
+   // Automatic mastery: reward consistency, with diminishing returns.
+   s.mastery=Math.min(100,Math.round(s.mastery + (100-s.mastery)*0.18 + 3));
+   const intervals=[1,2,4,7,14,30,60];
+   let level=Math.min(intervals.length-1,Math.floor(s.mastery/15));
+   s.next=Date.now()+intervals[level]*86400000;
+   document.getElementById("feedback").innerHTML=`<div class="ok">✓ Benar — <b>${w[2]}</b></div><small>Mastery otomatis: ${s.mastery}%</small>`;
+ }else{
+   s.wrong++;
+   s.mastery=Math.max(0,Math.round(s.mastery*0.58));
+   s.next=Date.now()+Math.max(10,Math.min(60,20*s.wrong))*60000;
+   document.getElementById("feedback").innerHTML=`<div class="no">✗ Belum tepat</div><small>Jawaban: <b>${w[2]}</b> · Mastery turun ke ${s.mastery}% · review dipercepat</small>`;
+ }
+ localStorage.setItem("n4auto",JSON.stringify(data));
+ document.getElementById("input").disabled=true; document.getElementById("next").style.display="block";
+ update();
+}
+function nextCard(){choose()}
+function update(){
+ let vals=WORDS.map((_,i)=>cardState(i).mastery), avg=Math.round(vals.reduce((a,b)=>a+b,0)/vals.length);
+ let due=WORDS.filter((_,i)=>cardState(i).next<=Date.now()).length;
+ document.getElementById("mastery").textContent=avg+"%";
+ document.getElementById("today").textContent=data.today.count;
+ document.getElementById("review").textContent=due;
+ document.getElementById("bar").style.width=avg+"%";
+ document.getElementById("streak").textContent=data.streak+" 🔥";
+ document.getElementById("progressText").innerHTML=`${WORDS.length} kata · rata-rata mastery <b>${avg}%</b><br><small style="color:#9ca3af">${vals.filter(x=>x>=80).length} mastered · ${vals.filter(x=>x<40).length} masih lemah</small>`;
+ let weak=WORDS.map((w,i)=>({w,s:cardState(i)})).filter(x=>x.s.mastery<50).sort((a,b)=>a.s.mastery-b.s.mastery).slice(0,5);
+ document.getElementById("weakList").innerHTML=weak.length?weak.map(x=>`<div class="weak"><span>${x.w[0]} <small>${x.w[1]}</small></span><span class="pill">${x.s.mastery}%</span></div>`).join(""):"Mantap, belum ada kata lemah.";
+}
+function resetData(){if(confirm("Hapus semua progress?")){localStorage.removeItem("n4auto");location.reload()}}
+choose(); update();
+</script>
+</body>
+</html>
